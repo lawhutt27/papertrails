@@ -10,6 +10,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { CONFIG, TILE_SIZE, PATH_WIDTH, RIVER_WIDTH, FLAP_LAYER_GAP } from '../core/config.js';
 import { MODELS, MODEL_IDS, FALLBACK_MODEL } from '../core/models.js';
+import { buildArtAtlas } from './artset.js';
+import { recutCards } from './recut.js';
 
 const P = CONFIG.palette;
 
@@ -370,6 +372,27 @@ export async function loadAssets({ materials, renderer, quality } = {}) {
       traveller = null;
     }
   }
+  // Your own art (public/textures/art/mine/art.json, see docs/YOUR_ART.md): repaint the card atlas with the drawings
+  // on your sheet and re-cut the matching cards to their outlines. No art set: nothing changes.
+  let artSet = null;
+  if (textures.art && textures.art.image) {
+    try {
+      artSet = await buildArtAtlas(textures.art.image, await fetchJSON(A.texturesBase + 'art/atlas.json'));
+      if (artSet) {
+        const old = textures.art;
+        const t = new THREE.CanvasTexture(artSet.canvas);
+        t.flipY = false; t.colorSpace = old.colorSpace; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+        t.anisotropy = old.anisotropy; t.userData = old.userData;
+        textures.art = t;
+        old.dispose();
+        recutCards(protos.values(), artSet);
+      }
+    } catch (err) {
+      warn('art set failed, keeping the original art:', err && err.message);
+      console.error(err);
+    }
+  }
+
   const travFromGltf = !!traveller;
   if (!traveller) traveller = buildPlaceholderTraveller(materials);
 
@@ -390,6 +413,8 @@ export async function loadAssets({ materials, renderer, quality } = {}) {
     source,
     /** public/models/assets_meta.json (per-tile numbers, bridge deck profile, lantern post position) or null. */
     meta,
+    /** Your art set (artset.js) or null: { sprites, replaced, recut }. */
+    artSet,
     materials: mats,
     warnings,
     stats,

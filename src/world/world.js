@@ -959,6 +959,8 @@ export function createWorld({ scene, assets, wfc, materials, quality }) {
     setShown(rec, true);
     rec.flipAt = clock;
     rec.fold.setTarget(1, 0);
+    // diorama mode (world.popup false): no pop-up book animation, the cards simply stand
+    if (!POP) { rec.fold.snap(1); rec.dirty = true; }
     bus.emit('tile:rise', { x: rec.cx, z: rec.cz, tileId: rec.cell.tileId });
   }
 
@@ -967,7 +969,10 @@ export function createWorld({ scene, assets, wfc, materials, quality }) {
   // ================================================================================================
   const last = { x: 0, z: 0, px: 0, pz: 0, dx: 0, dz: -1, sx: 0, sz: -1, valid: false, fresh: false };
   let regionX = NaN; let regionZ = NaN;
-  const NEAR = REVEAL_RADIUS * W.nearRadiusMul;
+  // world.popup false (diorama mode): nothing folds up as you approach. Every tile within standRadius tiles simply
+  // stands, already upright, and is put away again (no fold-down) once it is out past the haze.
+  const POP = W.popup !== false;
+  const NEAR = POP ? REVEAL_RADIUS * W.nearRadiusMul : (W.standRadius ?? 5);
   const BACK_FOLD = W.foldBehind;
   const BACK_RISE = W.foldBehind - W.foldBehindHysteresis;
   let movingCount = 0;
@@ -1038,7 +1043,7 @@ export function createWorld({ scene, assets, wfc, materials, quality }) {
       if (instant || last.fresh) reach = wantReach;
       else if (reach !== wantReach) { const st = dt * (W.viewReachRate ?? 0.85); reach += Math.max(-st, Math.min(st, wantReach - reach)); }
     }
-    const RV = REVEAL_RADIUS + reach; const NEARV = NEAR + reach;
+    const RV = (POP ? REVEAL_RADIUS : NEAR) + reach; const NEARV = NEAR + reach;
     syncView();
     makeRoom(dt, instant || last.fresh);
     const tx = last.x / TILE_SIZE; const tz = last.z / TILE_SIZE;
@@ -1059,7 +1064,7 @@ export function createWorld({ scene, assets, wfc, materials, quality }) {
         book.markInk(cx, cz); // the print inks in one `inkLead` before the tile is asked to rise
         // tiles further than `foldBehind` rows BEHIND the heading are left flat (the page closes behind you)
         const back = -((cx - tx) * last.dx + (cz - tz) * last.dz);
-        if ((dF < RV || dT < NEARV) && (instant || back < BACK_RISE)) {
+        if ((dF < RV || dT < NEARV) && (instant || !POP || back < BACK_RISE)) {
           // a tile instance only exists while it is pending / moving / risen (flat tiles are just print)
           let rec = lookup(cx, cz);
           if (rec === null) {
@@ -1088,9 +1093,10 @@ export function createWorld({ scene, assets, wfc, materials, quality }) {
       const dT = hypot2(rec.cx - tx, rec.cz - tz);
       const dF = hypot2(rec.cx - fx, rec.cz - fz);
       const back = -((rec.cx - tx) * last.dx + (rec.cz - tz) * last.dz);
-      const want = (dF < RV || dT < NEARV) && back < BACK_FOLD;
+      const want = (dF < RV || dT < NEARV) && (!POP || back < BACK_FOLD);
       if (rec.pending) {
         if (!want) rec.pending = false;
+        else if (!POP) { if (book.cellOnPage(rec.cx, rec.cz, 0)) rise(rec); }
         else if (book.cellOnPage(rec.cx, rec.cz, 0)) { // a tile only rises once it is wholly on the printed page
           if (instant) rise(rec);
           else if (book.inkReady(rec.cx, rec.cz)) {
@@ -1108,8 +1114,14 @@ export function createWorld({ scene, assets, wfc, materials, quality }) {
       const onPage = book.cellOnPage(rec.cx, rec.cz, W.pageHysteresis);
       if (rec.shown) {
         const fold = rec.fold;
-        const behind = back >= BACK_FOLD && !instant;
-        if (fold.target === 1 && (!onPage || (!want && (behind || (dT > (FOLD_BACK_RADIUS + reach) && dF >= RV + W.foldHysteresis)) && (instant || clock - rec.flipAt >= W.minFlipInterval)))) {
+        const behind = POP && back >= BACK_FOLD && !instant;
+        if (!POP) {
+          // diorama mode: off the page, or out past the stand radius (+ hysteresis): put away at once, no fold-down
+          if (fold.target === 1 && (!onPage || (!want && dT > NEARV + W.foldHysteresis && dF > RV + W.foldHysteresis))) {
+            fold.snap(0); setShown(rec, false);
+            bus.emit('tile:flat', { x: rec.cx, z: rec.cz, tileId: rec.cell.tileId });
+          }
+        } else if (fold.target === 1 && (!onPage || (!want && (behind || (dT > (FOLD_BACK_RADIUS + reach) && dF >= RV + W.foldHysteresis)) && (instant || clock - rec.flipAt >= W.minFlipInterval)))) {
           rec.flipAt = clock;
           // the row behind closes from the traveller's track outward (stagger by sideways distance)
           let delay = 0;

@@ -9,5 +9,7 @@ export default defineConfig({
     outDir: 'dist',
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 1500,
+    // two pages: the game, and the art guide for painting your own cards (art-guide.html)
+    rollupOptions: { input: { main: 'index.html', guide: 'art-guide.html' } },
   },
 });

@@ -10,6 +10,7 @@
 // under it stands (it pops up as the tile settles and hides when it folds). Animals walk only where
 // world.clearance allows and never collide with the traveller. Per frame nothing is allocated.
 import * as THREE from 'three';
+import { buildArtAnimals } from '../assets/artset.js';
 import { CONFIG, TILE_SIZE } from '../core/config.js';
 import { hash2f } from '../core/rng.js';
 import { biomeAt } from '../core/biomes.js';
@@ -130,8 +131,13 @@ export function createAnimals({ scene, renderer, world, traveller, daynight, ass
       const res = await fetch('./textures/art/animals.json');
       if (!res.ok) return false;
       const json = await res.json();
-      const t = await new THREE.TextureLoader().loadAsync('./textures/art/' + (json.image || 'animals.png'));
+      let t = await new THREE.TextureLoader().loadAsync('./textures/art/' + (json.image || 'animals.png'));
       if (disposed) { t.dispose(); return false; }
+      // your own art set may repaint some animals (art.json "animals", see docs/YOUR_ART.md)
+      try {
+        const mine = await buildArtAnimals(t.image, json);
+        if (mine) { const ct = new THREE.CanvasTexture(mine); ct.flipY = t.flipY; t.dispose(); t = ct; }
+      } catch (err) { console.warn('[art] animals kept as they were:', err && err.message); }
       t.colorSpace = THREE.SRGBColorSpace;
       t.magFilter = THREE.LinearFilter;
       t.minFilter = THREE.LinearMipmapLinearFilter;

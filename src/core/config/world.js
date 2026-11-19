@@ -1,5 +1,10 @@
 // OWNER: world agent. Tunables for src/world/world.js + src/world/book.js.
 export const world = {
+  /** false = diorama mode: no pop-up book animation. Every card within `standRadius` tiles of the traveller simply
+   *  stands, upright from the start, and is quietly put away once it is out in the haze. true = the original
+   *  pop-up-as-you-walk behaviour (reveal ring, fold-down behind you). URL: ?popup=1 turns it back on. */
+  popup: typeof location !== 'undefined' && new URLSearchParams(location.search).get('popup') === '1',
+  standRadius: 6.5,
   /** The reveal circle is centred FORWARD_BIAS tiles ahead of the traveller along the movement direction. */
   forwardBias: 1.35, // was 0.9; the anchor now trails the traveller by graceRadius
   /** Grace area (world units): the traveller can move this far around the streaming anchor without anything rising or folding. */

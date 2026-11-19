@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Art Guide</title>
+<style>
+  :root { --bg: #f3ead8; --ink: #3a2a20; --mute: #7a6450; --card: #fffaf0; --line: #d9c7a6; --accent: #b9603f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1812; --ink: #f1e4cc; --mute: #b39d82; --card: #2a2119; --line: #4a3a2a; --accent: #e08a5f; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 Georgia, 'Times New Roman', serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; } h2 { font-size: 20px; margin: 32px 0 8px; }
+  p, li { color: var(--mute); } code { background: var(--card); border: 1px solid var(--line); padding: 0 4px; border-radius: 4px; color: var(--ink); }
+  .sheet { position: relative; display: inline-block; max-width: 100%; background: repeating-conic-gradient(#0001 0 25%, transparent 0 50%) 0 0 / 16px 16px; border: 1px solid var(--line); }
+  .sheet img { display: block; max-width: 100%; }
+  .box { position: absolute; border: 2px solid var(--accent); border-radius: 3px; }
+  .box b { position: absolute; left: -2px; top: -22px; background: var(--accent); color: #fff; font: 600 12px/18px system-ui, sans-serif; padding: 0 6px; border-radius: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .kind { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .kind h3 { margin: 0; font-size: 16px; } .kind .n { color: var(--mute); font-size: 13px; }
+  .thumbs { display: flex; gap: 6px; align-items: flex-end; min-height: 70px; margin: 8px 0 4px; flex-wrap: wrap; }
+  .thumbs canvas { max-height: 64px; max-width: 64px; }
+  .names { font: 12px/1.4 ui-monospace, monospace; color: var(--mute); word-break: break-all; }
+  .tag { display: inline-block; font: 600 11px/16px system-ui, sans-serif; padding: 0 6px; border-radius: 8px; background: var(--line); color: var(--ink); margin-left: 6px; }
+  #status { font-style: italic; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Art guide</h1>
+  <p>Draw your sprites on one sheet, put it in <code>public/textures/art/mine/</code> with an <code>art.json</code>, and the game cuts them into paper cards. This page shows how the game numbers the drawings on your sheet, and every card slot you can paint. Full steps: <code>docs/YOUR_ART.md</code>.</p>
+
+  <h2>Your sheet</h2>
+  <p id="status">Loading…</p>
+  <div class="sheet" id="sheet"></div>
+
+  <h2>Card slots, by kind</h2>
+  <p>Map a whole kind (<code>"kinds": { "tree": [1, 2, 3] }</code>) or one slot by name (<code>"slots": { "trees_a_4": 2 }</code>). Kinds marked <span class="tag">fill</span> are walls and roofs: your picture is stretched to the slot and the card keeps its folded shape. Every other kind is fitted (feet on the ground) and the card is re-cut to your outline.</p>
+  <div class="grid" id="kinds"></div>
+
+  <h2>Animals</h2>
+  <p>Animals are flat standees that face right: <code>"animals": { "fox": 9 }</code> uses drawing 9 for every pose, or name poses one by one (<code>{ "walk_a": 9, "walk_b": 10, "*": 9 }</code>).</p>
+  <div class="grid" id="animals"></div>
+</main>
+<script type="module" src="/src/tools/artguide.js"></script>
+</body>
+</html>

@@ -116,6 +116,10 @@ export const dof = {
 };
 
 export const post = {
+  // Dream pass, carried over from WILD MINDS 2.5D (render/post.js composite): a soft Orton glow (the paper seems to
+  // breathe light), slow slanted sun shafts and a warm light leak from the sun's corner. Night swaps the leak for a
+  // faint moon wash and strengthens the glow round lanterns. ?dream=0 turns the whole pass off for comparison.
+  dream: { enabled: true, glow: 0.28, glowRadiusPx: 16, glowThreshold: 0.16, shafts: 0.14, shaftSlant: 0.6, leak: 0.13 },
   exposure: 0.79, // integrator (gold pass): 0.76 -> 0.79 with the paler, less saturated grade below
   closeExposure: 0.82, // exposure multiplier for macro framing (camera within ~4 units of the focus point; blends out by 8)
   tint: [1.05, 0.96, 1.0], // white balance before the tone curve (integrator, gold pass: blue 0.93 -> 1.0, the gold-style sprites are already warm and the crowns clipped to pure orange)
