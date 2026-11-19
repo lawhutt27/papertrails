@@ -36,6 +36,7 @@ export function createDayNight({ scene, night = false }) {
     update(dt) {
       if (cur !== target) cur = target > cur ? Math.min(target, cur + dt / 1.6) : Math.max(target, cur - dt / 1.6);
       const e = cur * cur * (3 - 2 * cur);
+      state.nightK = e; // post.js dream pass: shafts and the warm leak fade out at night
       const t = state.traveller;
       const ts = CONFIG.TILE_SIZE || 2;
       if (grade.update(dt, state.seed, t.x / ts, t.z / ts, e) || !glow) applyGlow();

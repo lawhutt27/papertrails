@@ -10,6 +10,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { CONFIG, TILE_SIZE, PATH_WIDTH, RIVER_WIDTH, FLAP_LAYER_GAP } from '../core/config.js';
 import { MODELS, MODEL_IDS, FALLBACK_MODEL } from '../core/models.js';
+import { buildArtAtlas } from './artset.js';
+import { recutCards } from './recut.js';
 
 const P = CONFIG.palette;
 
@@ -180,7 +182,39 @@ async function loadGLTF(url) {
   try {
     return await new GLTFLoader().loadAsync(url);
   } catch (err) {
+    // hosts that do not serve .glb files (e.g. a claude.ai artifact) get the same model as a standard glTF JSON file
+    // with its buffer embedded (tools/glb_to_gltf_json.py writes <name>.gltf.json next to the .glb)
+    const alt = await loadEmbeddedGLTF(url.replace(/\.glb$/, '.gltf.json'));
+    if (alt) return alt;
     warn('could not load', url, '-', err && err.message ? err.message : String(err));
+    return null;
+  }
+}
+
+/** glTF JSON with one base64 data-URI buffer -> rebuilt in memory as a binary glTF and parsed (no data: fetches). */
+async function loadEmbeddedGLTF(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json.buffers || json.buffers.length !== 1) return null;
+    const m = /^data:[^,]*;base64,(.*)$/.exec(json.buffers[0].uri || '');
+    if (!m) return null;
+    const raw = atob(m[1]);
+    const bin = new Uint8Array((raw.length + 3) & ~3);
+    for (let i = 0; i < raw.length; i++) bin[i] = raw.charCodeAt(i);
+    delete json.buffers[0].uri;
+    let text = new TextEncoder().encode(JSON.stringify(json));
+    const jl = (text.length + 3) & ~3;
+    const glb = new Uint8Array(12 + 8 + jl + 8 + bin.length);
+    const dv = new DataView(glb.buffer);
+    dv.setUint32(0, 0x46546c67, true); dv.setUint32(4, 2, true); dv.setUint32(8, glb.length, true);
+    dv.setUint32(12, jl, true); dv.setUint32(16, 0x4e4f534a, true);
+    glb.fill(0x20, 20, 20 + jl); glb.set(text, 20);
+    dv.setUint32(20 + jl, bin.length, true); dv.setUint32(24 + jl, 0x004e4942, true);
+    glb.set(bin, 28 + jl);
+    return await new GLTFLoader().parseAsync(glb.buffer, '');
+  } catch (err) {
     return null;
   }
 }
@@ -370,6 +404,27 @@ export async function loadAssets({ materials, renderer, quality } = {}) {
       traveller = null;
     }
   }
+  // Your own art (public/textures/art/mine/art.json, see docs/YOUR_ART.md): repaint the card atlas with the drawings
+  // on your sheet and re-cut the matching cards to their outlines. No art set: nothing changes.
+  let artSet = null;
+  if (textures.art && textures.art.image) {
+    try {
+      artSet = await buildArtAtlas(textures.art.image, await fetchJSON(A.texturesBase + 'art/atlas.json'));
+      if (artSet) {
+        const old = textures.art;
+        const t = new THREE.CanvasTexture(artSet.canvas);
+        t.flipY = false; t.colorSpace = old.colorSpace; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+        t.anisotropy = old.anisotropy; t.userData = old.userData;
+        textures.art = t;
+        old.dispose();
+        recutCards(protos.values(), artSet);
+      }
+    } catch (err) {
+      warn('art set failed, keeping the original art:', err && err.message);
+      console.error(err);
+    }
+  }
+
   const travFromGltf = !!traveller;
   if (!traveller) traveller = buildPlaceholderTraveller(materials);
 
@@ -390,6 +445,8 @@ export async function loadAssets({ materials, renderer, quality } = {}) {
     source,
     /** public/models/assets_meta.json (per-tile numbers, bridge deck profile, lantern post position) or null. */
     meta,
+    /** Your art set (artset.js) or null: { sprites, replaced, recut }. */
+    artSet,
     materials: mats,
     warnings,
     stats,

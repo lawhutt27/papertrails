@@ -18,6 +18,7 @@ import { CONFIG, qualitySettings } from '../core/config.js';
 import { state } from '../core/state.js';
 // integration: V8's Math.hypot allocates (rest-argument array) on every call; this 2-argument form is allocation-free.
 const hypot2 = (a, b) => Math.sqrt(a * a + b * b);
+const DREAM_URL = typeof location === 'undefined' || new URLSearchParams(location.search).get('dream') !== '0';
 
 const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -276,6 +277,8 @@ uniform vec3 uRimColor;
 uniform vec3 uSeed;        // frame seed, rim width px, view mode
 uniform float uSharpen;
 uniform vec3 uTint;
+uniform vec4 uDream;       // dream glow, light shafts, light leak, night 0..1
+uniform vec4 uDream2;      // time (s), glow radius (px), shaft slant, glow threshold
 vec3 aces( vec3 x ) { return clamp( ( x * ( 2.51 * x + 0.03 ) ) / ( x * ( 2.43 * x + 0.59 ) + 0.14 ), 0.0, 1.0 ); }
 vec3 toSRGB( vec3 c ) { return mix( c * 12.92, 1.055 * pow( max( c, vec3( 0.0 ) ), vec3( 1.0 / 2.4 ) ) - 0.055, step( 0.0031308, c ) ); }
 float hash12( vec2 p ) {
@@ -360,6 +363,40 @@ void main() {
       col += sp * uSpill * ( col * 5.0 + 0.035 ) * ( 1.0 - smoothstep( 0.5, 1.4, cl ) );
     }
   #endif
+
+  // --- dream pass (from WILD MINDS 2.5D): soft glow, slanted sun shafts, warm light leak -----------------
+  // Everything here is light ADDED in linear HDR before the tone curve, so it rolls off like real light.
+  if ( uDream.x > 0.0 ) {
+    // Orton-style dream glow: a wide soft copy of the image screen-blended over itself. The half-res DOF layer is
+    // sampled on a ring, so the glow is soft even inside the sharp band; only the brighter tones bloom outward.
+    vec3 gsum = vec3( 0.0 );
+    float gr = uDream2.y;
+    for ( int i = 0; i < 8; i ++ ) {
+      float an = float( i ) * 2.3999632 + 0.4;
+      float rr = gr * sqrt( ( float( i ) + 0.5 ) / 8.0 );
+      gsum += texture2D( tBlur, vUv + vec2( cos( an ), sin( an ) ) * rr * uTexel ).rgb;
+    }
+    gsum *= 0.125;
+    vec3 gl3 = max( gsum - uDream2.w, 0.0 );
+    col += gl3 * uDream.x * ( 1.0 + uDream.w * 1.5 );
+  }
+  float dDay = 1.0 - uDream.w;
+  if ( uDream.y > 0.0 && dDay > 0.01 ) {
+    // light shafts: soft beams leaning along the key light (screen-left, high), drifting very slowly. Two sine
+    // octaves give uneven widths; they fade toward the bottom of the frame and never touch the darkest pixels
+    vec2 sp = vUv * vec2( uProj.w, 1.0 );
+    float s = sp.x - sp.y * uDream2.z;
+    float beam = max( sin( s * 7.0 + uDream2.x * 0.045 ), 0.0 ) * max( sin( s * 17.0 - uDream2.x * 0.07 + 1.7 ), 0.0 );
+    beam = pow( beam, 1.5 ) * smoothstep( 0.0, 0.85, vUv.y ) * ( 0.55 + 0.45 * smoothstep( 1.2, 0.0, vUv.x ) );
+    float lit = smoothstep( 0.02, 0.25, luma( col ) );
+    col += vec3( 1.0, 0.86, 0.62 ) * beam * uDream.y * lit * dDay;
+  }
+  if ( uDream.z > 0.0 ) {
+    // warm light leak from the sun's corner (top-left); at night a faint cool moon wash instead
+    vec2 lp = ( vUv - vec2( -0.05, 1.05 ) ) * vec2( uProj.w, 1.0 );
+    float leak = smoothstep( 1.6, 0.0, length( lp ) );
+    col += mix( vec3( 1.0, 0.72, 0.42 ), vec3( 0.35, 0.45, 0.7 ) * 0.4, uDream.w ) * leak * leak * uDream.z;
+  }
 
   // --- lens + film ------------------------------------------------------------------------------------
   vec2 vc = ( vUv - 0.5 ) * vec2( uProj.w / 1.7778, 1.0 ) * vec2( 1.0, 1.12 );
@@ -499,6 +536,7 @@ export function createPost({ renderer, scene, camera, quality = 'high' }) {
       uTexel: shared.uTexel, uTone: { value: new THREE.Vector4(1, 1, 1, 0) }, uShadowTint: { value: new THREE.Color() },
       uLens: { value: new THREE.Vector4(0.2, 0.02, 1.3, 0.5) }, uFx: { value: new THREE.Vector4(0.5, 1, 0.3, 0.04) },
       uAoTint: shared.uAoTint, uRimColor: { value: new THREE.Color() }, uSeed: { value: new THREE.Vector3(0, 1, 0) }, uSharpen: { value: 0.3 }, uTint: { value: new THREE.Vector3(1, 1, 1) },
+      uDream: { value: new THREE.Vector4(0, 0, 0, 0) }, uDream2: { value: new THREE.Vector4(0, 14, 0.55, 0.2) },
     }, defs);
   }
   buildMaterials();
@@ -608,6 +646,11 @@ export function createPost({ renderer, scene, camera, quality = 'high' }) {
     c.uSharpen.value = api.enabled ? P.sharpen ?? 0 : 0;
     const tint = P.tint || [1, 1, 1];
     c.uTint.value.set(tint[0], tint[1], tint[2]);
+    // dream pass (render.js post.dream): ?dream=0 switches it off for comparison
+    const DR = P.dream;
+    const dreamOn = DR && DR.enabled !== false && api.enabled && DREAM_URL;
+    c.uDream.value.set(dreamOn ? DR.glow : 0, dreamOn ? DR.shafts : 0, dreamOn ? DR.leak : 0, state.nightK || 0);
+    c.uDream2.value.set(state.time % 10000, dreamOn ? (DR.glowRadiusPx * height) / 1080 : 1, DR ? DR.shaftSlant : 0.55, DR ? DR.glowThreshold : 0.2);
     c.uSeed.value.set(Math.floor(state.time * 60) % 1024, (P.edgeRimPx ?? 1.25) * Math.max(1, height / 900) * (fz < 9 ? 1.5 : 1), api.view || 0);
     // colours that must come out exact after the tone curve
     const key = [P.exposure, P.contrast, P.saturation, (P.tint || []).join(), CONFIG.lights.background, CONFIG.lights.fade.color, CONFIG.lights.fade.colorRight].join('|');

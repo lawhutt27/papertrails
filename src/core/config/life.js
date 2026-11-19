@@ -5,6 +5,8 @@
 // Around a biome border the values cross-fade with core/biomes.js biomeWeights (per particle, so snow keeps to
 // the snowy side of a border). Night / day factors are applied on top (see `night`).
 export const life = {
+  // Dream pass (from WILD MINDS 2.5D): golden dust motes hang in the sunlight and a thin mist lies over heartland,
+  // blossom and pinewood (dust / mist columns below), so walking through the diorama feels like a dream.
   enabled: true,
   /** Wrap box (world units) around the traveller in which weather lives, and the spawn height of fallers. */
   box: { w: 19, d: 17, h: 4.6 },
@@ -13,11 +15,11 @@ export const life = {
 
   biomes: {
     //            leaves dust  gusts snow  petals rain  mist  fireflies butterflies clouds birds
-    heartland: { leaves: 0.8, dust: 0.0, gusts: 0.0, snow: 0.0, petals: 0.0, rain: 0.0, mist: 0.0, fireflies: 0.3, butterflies: 0.5, clouds: 0.8, birds: 1.0 },
+    heartland: { leaves: 0.8, dust: 0.6, gusts: 0.0, snow: 0.0, petals: 0.0, rain: 0.0, mist: 0.35, fireflies: 0.3, butterflies: 0.5, clouds: 0.8, birds: 1.0 },
     desert:    { leaves: 0.0, dust: 1.0, gusts: 1.0, snow: 0.0, petals: 0.0, rain: 0.0, mist: 0.0, fireflies: 0.0, butterflies: 0.0, clouds: 0.7, birds: 0.5 },
     snow:      { leaves: 0.0, dust: 0.0, gusts: 0.0, snow: 1.0, petals: 0.0, rain: 0.0, mist: 0.25, fireflies: 0.0, butterflies: 0.0, clouds: 0.6, birds: 0.5 },
-    blossom:   { leaves: 0.0, dust: 0.0, gusts: 0.0, snow: 0.0, petals: 1.0, rain: 0.0, mist: 0.0, fireflies: 0.75, butterflies: 1.0, clouds: 0.7, birds: 1.0 },
-    pinewood:  { leaves: 0.12, dust: 0.0, gusts: 0.0, snow: 0.0, petals: 0.0, rain: 1.0, mist: 1.0, fireflies: 1.0, butterflies: 0.0, clouds: 0.6, birds: 0.6 },
+    blossom:   { leaves: 0.0, dust: 0.5, gusts: 0.0, snow: 0.0, petals: 1.0, rain: 0.0, mist: 0.3, fireflies: 0.75, butterflies: 1.0, clouds: 0.7, birds: 1.0 },
+    pinewood:  { leaves: 0.12, dust: 0.45, gusts: 0.0, snow: 0.0, petals: 0.0, rain: 1.0, mist: 1.0, fireflies: 1.0, butterflies: 0.0, clouds: 0.6, birds: 0.6 },
   },
 
   /** Pool sizes (instances). Everything lives in two draw calls, so these only cost a few triangles each. */

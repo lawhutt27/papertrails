@@ -1,0 +1,14 @@
+{
+  "about": "PLACEHOLDER example art set (drawn by tools/make_example_sheet.py) - shows the pipeline with new art. Open the game with ?art=example. Put YOUR art in ../mine/ (see docs/YOUR_ART.md).",
+  "sheet": "sheet.png",
+  "rim": 3,
+  "rimColor": "#f4e6c8",
+  "kinds": {
+    "tree": [1, 2, 3],
+    "blossom_tree": [2],
+    "pine": [4, 5],
+    "darkpine": [4],
+    "bush": [6, 7],
+    "rock": [8]
+  }
+}
